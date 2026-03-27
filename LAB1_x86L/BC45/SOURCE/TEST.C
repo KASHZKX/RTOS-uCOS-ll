@@ -19,18 +19,26 @@
 */
 
 #define  TASK_STK_SIZE                 512       /* Size of each task's stacks (# of WORDs)            */
-#define  N_TASKS                        10       /* Number of identical tasks                          */
+#define  MAX_TASKS                       3       /* Number of identical tasks                          */
+#define  TASK_SET_NO                     1       /* No of test sets (1, 2)                             */
 
 /*
 *********************************************************************************************************
 *                                               VARIABLES
 *********************************************************************************************************
 */
+typedef struct {
+    INT16U TaskID;
+    INT16U TaskCompTime;
+    INT16U TaskPeriod;
+} TASKCFG;
 
-OS_STK        TaskStk[N_TASKS][TASK_STK_SIZE];        /* Tasks stacks                                  */
+OS_STK        TaskStk[MAX_TASKS][TASK_STK_SIZE];        /* Tasks stacks                                  */
 OS_STK        TaskStartStk[TASK_STK_SIZE];
-char          TaskData[N_TASKS];                      /* Parameters to pass to each task               */
+TASKCFG       TaskCFG[MAX_TASKS];                      /* Parameters to pass to each task               */
 OS_EVENT     *RandomSem;
+INT8U         Taskcount;
+INT32U        startTick;
 
 /*
 *********************************************************************************************************
@@ -40,6 +48,7 @@ OS_EVENT     *RandomSem;
 
         void  Task(void *data);                       /* Function prototypes of tasks                  */
         void  TaskStart(void *data);                  /* Function prototypes of Startup task           */
+static  void  InitTestSet (void);
 static  void  TaskStartCreateTasks(void);
 static  void  TaskStartDispInit(void);
 static  void  TaskStartDisp(void);
@@ -66,7 +75,6 @@ void  main (void)
     OSStart();                                             /* Start multitasking                       */
 }
 
-
 /*
 *********************************************************************************************************
 *                                              STARTUP TASK
@@ -92,6 +100,7 @@ void  TaskStart (void *pdata)
 
     OSStatInit();                                          /* Initialize uC/OS-II's statistics         */
 
+    InitTestSet();                                         /* Initialize test set                      */
     TaskStartCreateTasks();                                /* Create all the application tasks         */
 
     for (;;) {
@@ -123,7 +132,7 @@ static  void  TaskStartDispInit (void)
     PC_DispStr( 0,  0, "                         uC/OS-II, The Real-Time Kernel                         ", DISP_FGND_WHITE + DISP_BGND_RED + DISP_BLINK);
     PC_DispStr( 0,  1, "                                Jean J. Labrosse                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  2, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0,  3, "                                    EXAMPLE #1                                  ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    PC_DispStr( 0,  3, "                                    LAB #1                                      ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  4, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  5, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  6, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
@@ -194,6 +203,40 @@ static  void  TaskStartDisp (void)
     }
 }
 
+/*
+*********************************************************************************************************
+*                                              InitTestSet
+*********************************************************************************************************
+*/
+
+void  InitTestSet (void){
+#if TASK_SET_NO == 1
+    Taskcount = 2;
+
+    TaskCFG[0].TaskID = 1;
+    TaskCFG[0].TaskCompTime = 100;
+    TaskCFG[0].TaskPeriod = 300;
+
+    TaskCFG[1].TaskID = 2;
+    TaskCFG[1].TaskCompTime = 300;
+    TaskCFG[1].TaskPeriod = 600;
+#elif TASK_SET_NO == 2 
+    Taskcount = 3;
+
+    TaskCFG[0].TaskID = 1;
+    TaskCFG[0].TaskCompTime = 1;
+    TaskCFG[0].TaskPeriod = 3;
+
+    TaskCFG[1].TaskID = 2;
+    TaskCFG[1].TaskCompTime = 3;
+    TaskCFG[1].TaskPeriod = 6;
+
+    TaskCFG[2].TaskID = 3;
+    TaskCFG[2].TaskCompTime = 4;  
+    TaskCFG[2].TaskPeriod = 9;
+#endif
+}
+
 /*$PAGE*/
 /*
 *********************************************************************************************************
@@ -206,10 +249,19 @@ static  void  TaskStartCreateTasks (void)
     INT8U  i;
 
 
-    for (i = 0; i < N_TASKS; i++) {                        /* Create N_TASKS identical tasks           */
-        TaskData[i] = '0' + i;                             /* Each task will display its own letter    */
-        OSTaskCreate(Task, (void *)&TaskData[i], &TaskStk[i][TASK_STK_SIZE - 1], i + 1);
+    for (i = 0; i < Taskcount; i++) {                        /* Create N_TASKS identical tasks           */
+        OSTaskCreateExt(
+            Task,
+            (void *)&TaskCFG[i],
+            &TaskStk[i][TASK_STK_SIZE - 1],
+            i + 1,
+            i + 1,
+            &TaskStk[i][0],
+            TASK_STK_SIZE,
+            (void *)0,
+            0);
     }
+    startTick = OSTimeGet() + 1L;
 }
 
 /*
@@ -220,18 +272,50 @@ static  void  TaskStartCreateTasks (void)
 
 void  Task (void *pdata)
 {
-    INT8U  x;
-    INT8U  y;
-    INT8U  err;
+    TASKCFG curTask;
+    INT32U start;
+    INT32U end;
+    INT32U toDelay;
+    char s[20];
 
+    curTask = *(TASKCFG *)pdata;
+
+    PC_DispChar(0, curTask.TaskID + 5, curTask.TaskID + '0', DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    sprintf(s, "%5d", curTask.TaskCompTime);
+    PC_DispStr(5, curTask.TaskID + 5, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    sprintf(s, "%5d", curTask.TaskPeriod);
+    PC_DispStr(10, curTask.TaskID + 5, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+
+    while (OSTimeGet() < startTick) {
+        OSTimeDly(1);
+    }
+
+
+
+    start = OSTimeGet();
+
+    OS_ENTER_CRITICAL();
+    OSTCBCur->compTime = curTask.TaskCompTime;
+    OS_EXIT_CRITICAL();
 
     for (;;) {
-        OSSemPend(RandomSem, 0, &err);           /* Acquire semaphore to perform random numbers        */
-        x = random(80);                          /* Find X position where task number will appear      */
-        y = random(16);                          /* Find Y position where task number will appear      */
-        OSSemPost(RandomSem);                    /* Release semaphore                                  */
-                                                 /* Display the task number on the screen              */
-        PC_DispChar(x, y + 5, *(char *)pdata, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-        OSTimeDly(1);                            /* Delay 1 clock tick                                 */
+        while(OSTCBCur->compTime > 0){
+        }
+        OSTCBCur->compTime = curTask.TaskCompTime;
+
+        end = OSTimeGet();
+        toDelay = (curTask.TaskPeriod) - (end - start);
+        start = start + (curTask.TaskPeriod);
+
+        // sprintf(s, "%5d", start-startTick);
+        // PC_DispStr(15, curTask.TaskID + 5, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+        // sprintf(s, "%5d", end-startTick);
+        // PC_DispStr(20, curTask.TaskID + 5, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+        // sprintf(s, "%5d", toDelay);
+        // PC_DispStr(25, curTask.TaskID + 5, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);  
+        OSTimeDly(toDelay);  
     }
 }
+
+
+

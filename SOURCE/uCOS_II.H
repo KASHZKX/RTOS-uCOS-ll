@@ -400,6 +400,8 @@ typedef struct os_tcb {
     INT8U          OSTCBStat;          /* Task status                                                  */
     INT8U          OSTCBPrio;          /* Task priority (0 == highest, 63 == lowest)                   */
 
+    INT8U          compTime;
+
     INT8U          OSTCBX;             /* Bit position in group  corresponding to task priority (0..7) */
     INT8U          OSTCBY;             /* Index into ready table corresponding to task priority        */
     INT8U          OSTCBBitX;          /* Bit mask to access bit position in ready table               */
