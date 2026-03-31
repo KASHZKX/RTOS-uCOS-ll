@@ -67,7 +67,6 @@ static  void  OS_InitRdyList(void);
 static  void  OS_InitTaskIdle(void);
 static  void  OS_InitTaskStat(void);
 static  void  OS_InitTCBList(void);
-
 /*$PAGE*/
 /*
 *********************************************************************************************************
@@ -186,6 +185,7 @@ void  OSIntExit (void)
             OSPrioHighRdy = (INT8U)((OSIntExitY << 3) + OSUnMapTbl[OSRdyTbl[OSIntExitY]]);
             if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
                 OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy];
+                OSLogPendEvent = OS_LOG_EVT_PREEMPT;      /* [Lab1] Tag as preempt for LOG           */ 
                 OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
                 OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
             }
@@ -376,12 +376,12 @@ void  OSTimeTick (void)
     OS_EXIT_CRITICAL();
 #endif
     if (OSRunning == TRUE) { 
-        if (OSTCBCur != (OS_TCB *)0) {
+        if (OSTCBCur != (OS_TCB *)0) {                     /*[Lab1] Decrease the compTime of the curTCB*/
             if (OSTCBCur->compTime > 0) {
                 OSTCBCur->compTime--;
             }
         }  
-        
+
         ptcb = OSTCBList;                                  /* Point at first TCB in TCB list           */
         while (ptcb->OSTCBPrio != OS_IDLE_PRIO) {          /* Go through all TCBs in TCB list          */
             OS_ENTER_CRITICAL();
@@ -674,6 +674,12 @@ static  void  OS_InitMisc (void)
     OSCtxSwCtr    = 0;                                           /* Clear the context switch counter         */
     OSIdleCtr     = 0L;                                          /* Clear the 32-bit idle counter            */
 
+    OSLogHead     = 0;                                           /* [Lab1] Clear LOG                         */ 
+    OSLogTail     = 0;                                           
+    OSLogCount    = 0;                                           
+    OSLogOverflowCtr = 0L;                                       
+    OSLogPendEvent = OS_LOG_EVT_NONE;                            
+
 #if (OS_TASK_STAT_EN > 0) && (OS_TASK_CREATE_EXT_EN > 0)
     OSIdleCtrRun  = 0L;
     OSIdleCtrMax  = 0L;
@@ -886,6 +892,7 @@ void  OS_Sched (void)
         OSPrioHighRdy = (INT8U)((y << 3) + OSUnMapTbl[OSRdyTbl[y]]);
         if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy     */
             OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
+            OSLogPendEvent = OS_LOG_EVT_COMPLETE;       /* [Lab1] tag as completed for LOG              */
             OSCtxSwCtr++;                              /* Increment context switch counter             */
             OS_TASK_SW();                              /* Perform a context switch                     */
         }
@@ -1113,4 +1120,84 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
     }
     OS_EXIT_CRITICAL();
     return (OS_NO_MORE_TCB);
+}
+
+/*$PAGE*/
+/*
+*********************************************************************************************************
+*                                         [Lab1] LOG Function
+*********************************************************************************************************
+*/
+void  OSLogTaskSwCapture(void){
+// #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
+//     OS_CPU_SR  cpu_sr;
+// #endif
+
+    OS_LOG *prec; 
+    if(OSLogPendEvent == OS_LOG_EVT_NONE || TimeIsReset == FALSE){
+        return;
+    }
+
+    prec = & OSLOGTbl[OSLogHead];
+    prec->time = OSTime;
+    prec->switchEvent = OSLogPendEvent;
+    prec->fromTaskID = OSTCBCur->OSTCBPrio;
+    prec->toTaskID = OSTCBHighRdy->OSTCBPrio;
+
+    if (prec->fromTaskID == OS_LOWEST_PRIO || prec->toTaskID == OS_LOWEST_PRIO){
+        return;
+    }
+    if (prec->fromTaskID == OS_LOWEST_PRIO-2){
+        prec->fromTaskID  = OS_LOWEST_PRIO;
+    }
+    if (prec->toTaskID  == OS_LOWEST_PRIO-2) {
+        prec->toTaskID  = OS_LOWEST_PRIO;
+    }
+
+    OSLogHead++;
+    if(OSLogHead >= OS_LOG_BUF_SIZE){
+        OSLogHead = 0;
+    }
+
+    if(OSLogCount < OS_LOG_BUF_SIZE){
+        OSLogCount++;
+    }
+    else{
+        OSLogOverflowCtr++;
+        OSLogTail++;
+        if(OSLogTail >= OS_LOG_BUF_SIZE){
+            OSLogTail = 0;
+        }
+    }
+}
+
+INT8U OSGetLOG(OS_LOG *prec){
+#if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
+    OS_CPU_SR  cpu_sr;
+#endif   
+    INT8U result;
+    char s[10];
+ 
+    if(prec == (OS_LOG *) 0){
+        return FALSE;
+    }
+     
+    result = FALSE;
+     
+    OS_ENTER_CRITICAL();
+    if(OSLogCount > 0){
+        *prec = OSLOGTbl[OSLogTail];
+        OSLogTail++;
+        if( OSLogTail >= OS_LOG_BUF_SIZE){
+            OSLogTail = 0;
+        }
+        OSLogCount--;
+        result = TRUE;
+    }
+    OS_EXIT_CRITICAL();
+    // sprintf(s, "%5d", OSLOGTbl[OSLogTail].switchEvent);
+    // PC_DispStr( 5, 10, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);  
+    // sprintf(s, "%5d", OSLogCount);
+    // PC_DispStr( 5, 9, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY); 
+    return result;
 }

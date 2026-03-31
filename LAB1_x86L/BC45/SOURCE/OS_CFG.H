@@ -27,15 +27,15 @@
                                        /* ... MUST be > 0                                              */
 #define OS_MAX_QS                 2    /* Max. number of queue control blocks in your application ...  */
                                        /* ... MUST be > 0                                              */
-#define OS_MAX_TASKS             11    /* Max. number of tasks in your application ...                 */
+#define OS_MAX_TASKS             62    /* Max. number of tasks in your application ...                 */
                                        /* ... MUST be >= 2                                             */
 
-#define OS_LOWEST_PRIO           12    /* Defines the lowest priority that can be assigned ...         */
+#define OS_LOWEST_PRIO           63    /* Defines the lowest priority that can be assigned ...         */
                                        /* ... MUST NEVER be higher than 63!                            */
 
 #define OS_TASK_IDLE_STK_SIZE   512    /* Idle task stack size (# of OS_STK wide entries)              */
 
-#define OS_TASK_STAT_EN           1    /* Enable (1) or Disable(0) the statistics task                 */
+#define OS_TASK_STAT_EN           0    /* Enable (1) or Disable(0) the statistics task                 */ /*[lab1] close stat */
 #define OS_TASK_STAT_STK_SIZE   512    /* Statistics task stack size (# of OS_STK wide entries)        */
 
 #define OS_ARG_CHK_EN             1    /* Enable (1) or Disable (0) argument checking                  */
@@ -108,7 +108,7 @@
 #define OS_SCHED_LOCK_EN          1    /*     Include code for OSSchedLock() and OSSchedUnlock()       */
 
 
-#define OS_TICKS_PER_SEC        200    /* Set the number of ticks in one second                        */
+#define OS_TICKS_PER_SEC          200    /* Set the number of ticks in one second                        */
 
 
 typedef INT16U             OS_FLAGS;   /* Date type for event flag bits (8, 16 or 32 bits)             */

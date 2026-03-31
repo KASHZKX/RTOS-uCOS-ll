@@ -288,6 +288,7 @@ void  OSTaskStkInit_FPE_x86 (OS_STK **pptos, OS_STK **ppbos, INT32U *psize)
 #if OS_CPU_HOOKS_EN > 0 
 void  OSTaskSwHook (void)
 {
+    OSLogTaskSwCapture();
 }
 #endif
 
