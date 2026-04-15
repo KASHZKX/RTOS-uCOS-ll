@@ -185,7 +185,9 @@ void  OSIntExit (void)
             OSPrioHighRdy = (INT8U)((OSIntExitY << 3) + OSUnMapTbl[OSRdyTbl[OSIntExitY]]);
             if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
                 OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy];
-                OSLogPendEvent = OS_LOG_EVT_PREEMPT;      /* [Lab1] Tag as preempt for LOG           */ 
+#if OS_LAB1_EN > 0 
+                OSLogPendEvent = OS_LOG_EVT_PREEMPT;       /* [Kash] Tag as preempt for LOG             */ 
+#endif
                 OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
                 OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
             }
@@ -376,12 +378,13 @@ void  OSTimeTick (void)
     OS_EXIT_CRITICAL();
 #endif
     if (OSRunning == TRUE) { 
-        if (OSTCBCur != (OS_TCB *)0) {                     /*[Lab1] Decrease the compTime of the curTCB*/
+#if OS_LAB1_EN > 0 
+        if (OSTCBCur != (OS_TCB *)0) {                     /*[Kash] Decrease the compTime of the curTCB*/
             if (OSTCBCur->compTime > 0) {
                 OSTCBCur->compTime--;
             }
         }  
-
+        
         ptcb = OSTCBList;                                  /* Point at first TCB in TCB list           */
         while (ptcb->OSTCBPrio != OS_IDLE_PRIO) {          /* Go through all TCBs in TCB list          */
             OS_ENTER_CRITICAL();
@@ -673,6 +676,9 @@ static  void  OS_InitMisc (void)
     
     OSCtxSwCtr    = 0;                                           /* Clear the context switch counter         */
     OSIdleCtr     = 0L;                                          /* Clear the 32-bit idle counter            */
+#if OS_LAB1_EN > 0 
+    OSLab1Init();                                                /* [Kash] Clear lab1 logging state          */
+#endif                        
 
     OSLogHead     = 0;                                           /* [Lab1] Clear LOG                         */ 
     OSLogTail     = 0;                                           
@@ -892,7 +898,9 @@ void  OS_Sched (void)
         OSPrioHighRdy = (INT8U)((y << 3) + OSUnMapTbl[OSRdyTbl[y]]);
         if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy     */
             OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
-            OSLogPendEvent = OS_LOG_EVT_COMPLETE;       /* [Lab1] tag as completed for LOG              */
+#if OS_LAB1_EN > 0
+            OSLogPendEvent = OS_LOG_EVT_COMPLETE;      /* [Kash] tag as completed for LOG              */
+#endif
             OSCtxSwCtr++;                              /* Increment context switch counter             */
             OS_TASK_SW();                              /* Perform a context switch                     */
         }
@@ -1062,7 +1070,9 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
         ptcb->OSTCBPrio      = (INT8U)prio;                /* Load task priority into TCB              */
         ptcb->OSTCBStat      = OS_STAT_RDY;                /* Task is ready to run                     */
         ptcb->OSTCBDly       = 0;                          /* Task is not delayed                      */
-        ptcb->compTime       = 0;
+#if OS_LAB1_EN > 0
+        ptcb->compTime       = 0;                          /* [Kash] Task's computation time           */ 
+#endif
 
 #if OS_TASK_CREATE_EXT_EN > 0
         ptcb->OSTCBExtPtr    = pext;                       /* Store pointer to TCB extension           */
