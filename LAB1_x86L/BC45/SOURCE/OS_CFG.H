@@ -40,7 +40,7 @@
 
 #define OS_ARG_CHK_EN             1    /* Enable (1) or Disable (0) argument checking                  */
 #define OS_CPU_HOOKS_EN           1    /* uC/OS-II hooks are found in the processor port files         */
-
+#define OS_LAB1_EN                1    /* Enable (1) or Disable (0) Lab1 logging extension             */
 
                                        /* ----------------------- EVENT FLAGS ------------------------ */
 #define OS_FLAG_EN                1    /* Enable (1) or Disable (0) code generation for EVENT FLAGS    */

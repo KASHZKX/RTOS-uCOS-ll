@@ -25,3 +25,4 @@
 #include "\software\ucos-ii\source\os_sem.c"
 #include "\software\ucos-ii\source\os_task.c"
 #include "\software\ucos-ii\source\os_time.c"
+#include "\software\ucos-ii\source\os_lab1.c"

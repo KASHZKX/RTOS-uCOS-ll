@@ -92,7 +92,8 @@ INCLUDES=      $(SOURCE)\INCLUDES.H  \
                $(SOURCE)\OS_CFG.H    \
                $(PORT)\OS_CPU.H      \
                $(PC)\PC.H            \
-               $(OS)\uCOS_II.H               
+               $(OS)\uCOS_II.H       \
+               $(OS)\OS_LAB1.H        
 
 ###############################################################################
 #                          CREATION OF .EXE FILE
@@ -149,6 +150,7 @@ $(OBJ)\TEST.OBJ:                      \
 
 $(OBJ)\uCOS_II.OBJ:                   \
                $(OS)\uCOS_II.C        \
+               $(OS)\OS_LAB1.C        \
                $(INCLUDES)
 
                COPY   $(OS)\uCOS_II.C       uCOS_II.C
@@ -163,3 +165,4 @@ $(WORK)\INCLUDES.H:                   \
                COPY   $(PC)\PC.H            PC.H
                COPY   $(PORT)\OS_CPU.H      OS_CPU.H
                COPY   $(OS)\uCOS_II.H       uCOS_II.H
+               COPY   $(OS)\OS_LAB1.H       OS_LAB1.H
