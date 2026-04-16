@@ -20,7 +20,7 @@
 
 #define  TASK_STK_SIZE                1024       /* Size of each task's stacks (# of WORDs)            */
 #define  MAX_TASKS                       5       /* Number of identical tasks                          */
-#define  TASK_SET_NO                     2       /* No of test sets (1, 2)                             */
+#define  TASK_SET_NO                     1       /* No of test sets (1, 2)                             */
 #define  LOG_STK_SIZE                 1024
 #define  LOG_FIRST_LINE                  1
 #define  LOG_LAST_LINE                  20
@@ -29,11 +29,6 @@
 *                                               VARIABLES
 *********************************************************************************************************
 */
-typedef struct {
-    INT16U TaskID;
-    INT16U TaskCompTime;
-    INT16U TaskPeriod;
-} TASKCFG;
 
 OS_STK        TaskStk[MAX_TASKS][TASK_STK_SIZE];        /* Tasks stacks                                  */
 OS_STK        TaskStartStk[TASK_STK_SIZE];
@@ -176,7 +171,7 @@ static  void  TaskStartCreateTasks (void)
             i + 1,
             &TaskStk[i][0],
             TASK_STK_SIZE,
-            (void *)0,
+            (void *)&TaskCFG[i],
             0);
     }
 
@@ -210,7 +205,8 @@ void  Task (void *pdata)
     curTask = *(TASKCFG *)pdata;
 
     OSSemPend(StartSem, 0, &err);
-    
+    sprintf(s,"%5u %5lu", OSTCBCur->compTime, OSTCBCur->deadLine);
+    PC_DispStr(0, curTask.TaskID,(INT8U *)s, DISP_FGND_RED + DISP_BGND_BLACK);
     start = 0;
 
     for (;;) {
@@ -282,7 +278,7 @@ void  LogTask (void *pdata){
                 from, 
                 to);
             
-            PC_DispStr(5, line, (INT8U *)s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+            // PC_DispStr(5, line, (INT8U *)s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
             if (fp_log != NULL) {
                 fprintf(fp_log, "%s\n", s);
             }

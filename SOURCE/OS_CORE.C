@@ -1070,9 +1070,6 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
         ptcb->OSTCBPrio      = (INT8U)prio;                /* Load task priority into TCB              */
         ptcb->OSTCBStat      = OS_STAT_RDY;                /* Task is ready to run                     */
         ptcb->OSTCBDly       = 0;                          /* Task is not delayed                      */
-#if OS_LAB1_EN > 0
-        ptcb->compTime       = 0;                          /* [Kash] Task's computation time           */ 
-#endif
 
 #if OS_TASK_CREATE_EXT_EN > 0
         ptcb->OSTCBExtPtr    = pext;                       /* Store pointer to TCB extension           */
@@ -1128,6 +1125,7 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
         OS_EXIT_CRITICAL();
         return (OS_NO_ERR);
     }
+
     OS_EXIT_CRITICAL();
     return (OS_NO_MORE_TCB);
 }

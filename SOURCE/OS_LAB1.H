@@ -12,6 +12,12 @@
 
 #if OS_LAB1_EN > 0
 
+typedef struct {
+    INT16U TaskID;
+    INT16U TaskCompTime;
+    INT16U TaskPeriod;
+} TASKCFG;
+
 /*
 *********************************************************************************************************
 *                                             [Lab1] LOG
