@@ -39,7 +39,6 @@ OS_STK        TaskStk[MAX_TASKS][TASK_STK_SIZE];        /* Tasks stacks         
 OS_STK        TaskStartStk[TASK_STK_SIZE];
 OS_STK        LogStk[LOG_STK_SIZE];
 TASKCFG       TaskCFG[MAX_TASKS];                      /* Parameters to pass to each task               */
-OS_EVENT     *RandomSem;
 INT8U         Taskcount;
 FILE *fp_log;
 /*
@@ -74,8 +73,6 @@ void  main (void)
     PC_DOSSaveReturn();                                    /* Save environment to return to DOS        */
     PC_VectSet(uCOS, OSCtxSw);                             /* Install uC/OS-II's context switch vector */
 
-    RandomSem   = OSSemCreate(1);                          /* Random number semaphore                  */
-
     OSTaskCreate(TaskStart, (void *)0, &TaskStartStk[TASK_STK_SIZE - 1], 0);
     OSStart();                                             /* Start multitasking                       */
 }
@@ -91,8 +88,10 @@ void  TaskStart (void *pdata)
     OS_CPU_SR  cpu_sr;
 #endif
     char       s[100];
+    INT8U  i;
     INT32U current;
     pdata = pdata;                                         /* Prevent compiler warning                 */
+    StartSem = OSSemCreate(0);
 
     OS_ENTER_CRITICAL();
     PC_VectSet(0x08, OSTickISR);                           /* Install uC/OS-II's clock tick ISR        */
@@ -109,9 +108,13 @@ void  TaskStart (void *pdata)
     while (OSTimeGet() == current){
     } 
 
+    TimeIsReset = TRUE;
+    OSTimeSet(0); 
+
     OS_ENTER_CRITICAL();
-    OSTimeSet(0);           
-        TimeIsReset = TRUE;
+    for (i = 0; i < Taskcount + 1; i++) { 
+        OSSemPost(StartSem);
+    }
     OS_EXIT_CRITICAL();
 
     OSTaskDel(OS_PRIO_SELF);
@@ -202,12 +205,11 @@ void  Task (void *pdata)
     INT32U end;
     INT32S toDelay;
     char s[64];
+    INT8U err;
 
     curTask = *(TASKCFG *)pdata;
 
-    while (TimeIsReset == FALSE) {
-        OSTimeDly(1);
-    }
+    OSSemPend(StartSem, 0, &err);
     
     start = 0;
 
@@ -245,16 +247,17 @@ void  LogTask (void *pdata){
     char from[16];
     char to[16];
     int     log_count;
+    INT8U err;
+    
     pdata = pdata; 
+
 
     fp_log = fopen("NEW_LOG.txt", "w");
     if (fp_log == NULL) {
         PC_DispStr(0, 24, "File Open Error!", DISP_FGND_RED);
     }
 
-    while (TimeIsReset == FALSE) {
-        OSTimeDly(1);
-    }
+    OSSemPend(StartSem, 0, &err);
 
     for(;;){   
 

@@ -384,7 +384,7 @@ void  OSTimeTick (void)
                 OSTCBCur->compTime--;
             }
         }  
-        
+#endif        
         ptcb = OSTCBList;                                  /* Point at first TCB in TCB list           */
         while (ptcb->OSTCBPrio != OS_IDLE_PRIO) {          /* Go through all TCBs in TCB list          */
             OS_ENTER_CRITICAL();
@@ -1130,84 +1130,4 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
     }
     OS_EXIT_CRITICAL();
     return (OS_NO_MORE_TCB);
-}
-
-/*$PAGE*/
-/*
-*********************************************************************************************************
-*                                         [Lab1] LOG Function
-*********************************************************************************************************
-*/
-void  OSLogTaskSwCapture(void){
-// #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
-//     OS_CPU_SR  cpu_sr;
-// #endif
-
-    OS_LOG *prec; 
-    if(OSLogPendEvent == OS_LOG_EVT_NONE || TimeIsReset == FALSE){
-        return;
-    }
-
-    prec = & OSLOGTbl[OSLogHead];
-    prec->time = OSTime;
-    prec->switchEvent = OSLogPendEvent;
-    prec->fromTaskID = OSTCBCur->OSTCBPrio;
-    prec->toTaskID = OSTCBHighRdy->OSTCBPrio;
-
-    if (prec->fromTaskID == OS_LOWEST_PRIO || prec->toTaskID == OS_LOWEST_PRIO){
-        return;
-    }
-    if (prec->fromTaskID == OS_LOWEST_PRIO-2){
-        prec->fromTaskID  = OS_LOWEST_PRIO;
-    }
-    if (prec->toTaskID  == OS_LOWEST_PRIO-2) {
-        prec->toTaskID  = OS_LOWEST_PRIO;
-    }
-
-    OSLogHead++;
-    if(OSLogHead >= OS_LOG_BUF_SIZE){
-        OSLogHead = 0;
-    }
-
-    if(OSLogCount < OS_LOG_BUF_SIZE){
-        OSLogCount++;
-    }
-    else{
-        OSLogOverflowCtr++;
-        OSLogTail++;
-        if(OSLogTail >= OS_LOG_BUF_SIZE){
-            OSLogTail = 0;
-        }
-    }
-}
-
-INT8U OSGetLOG(OS_LOG *prec){
-#if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
-    OS_CPU_SR  cpu_sr;
-#endif   
-    INT8U result;
-    char s[10];
- 
-    if(prec == (OS_LOG *) 0){
-        return FALSE;
-    }
-     
-    result = FALSE;
-     
-    OS_ENTER_CRITICAL();
-    if(OSLogCount > 0){
-        *prec = OSLOGTbl[OSLogTail];
-        OSLogTail++;
-        if( OSLogTail >= OS_LOG_BUF_SIZE){
-            OSLogTail = 0;
-        }
-        OSLogCount--;
-        result = TRUE;
-    }
-    OS_EXIT_CRITICAL();
-    // sprintf(s, "%5d", OSLOGTbl[OSLogTail].switchEvent);
-    // PC_DispStr( 5, 10, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);  
-    // sprintf(s, "%5d", OSLogCount);
-    // PC_DispStr( 5, 9, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY); 
-    return result;
 }

@@ -84,16 +84,6 @@
 
 /*
 *********************************************************************************************************
-*                                             [Lab1] LOG
-*********************************************************************************************************
-*/
-#define  OS_LOG_BUF_SIZE         256                   
-#define  OS_LOG_EVT_NONE          0
-#define  OS_LOG_EVT_COMPLETE      1
-#define  OS_LOG_EVT_PREEMPT       2
-
-/*
-*********************************************************************************************************
 *                                         EVENT FLAGS
 *********************************************************************************************************
 */
@@ -428,20 +418,6 @@ typedef struct os_tcb {
 /*$PAGE*/
 /*
 *********************************************************************************************************
-*                                            [Lab1] LOG structure
-*********************************************************************************************************
-*/
-
-typedef struct os_log {
-    INT16U         time;
-    INT8U          fromTaskID;
-    INT8U          toTaskID;
-    INT8U          switchEvent;
-} OS_LOG;
-
-/*$PAGE*/
-/*
-*********************************************************************************************************
 *                                            GLOBAL VARIABLES
 *********************************************************************************************************
 */
@@ -451,6 +427,7 @@ OS_EXT  INT32U            OSCtxSwCtr;               /* Counter of number of cont
 #if (OS_EVENT_EN > 0) && (OS_MAX_EVENTS > 0)
 OS_EXT  OS_EVENT         *OSEventFreeList;          /* Pointer to list of free EVENT control blocks    */
 OS_EXT  OS_EVENT          OSEventTbl[OS_MAX_EVENTS];/* Table of EVENT control blocks                   */
+OS_EXT  OS_EVENT          *StartSem;
 #endif
 
 #if (OS_VERSION >= 251) && (OS_FLAG_EN > 0) && (OS_MAX_FLAGS > 0)
@@ -493,13 +470,6 @@ OS_EXT  OS_TCB           *OSTCBList;                       /* Pointer to doubly 
 OS_EXT  OS_TCB           *OSTCBPrioTbl[OS_LOWEST_PRIO + 1];/* Table of pointers to created TCBs        */
 OS_EXT  OS_TCB            OSTCBTbl[OS_MAX_TASKS + OS_N_SYS_TASKS];   /* Table of TCBs                  */
 
-OS_EXT  OS_LOG            OSLOGTbl[OS_LOG_BUF_SIZE];        /* [LAB1] Table of LOGs                    */
-OS_EXT  INT8U             OSLogHead;                         /* Log write index                         */
-OS_EXT  INT8U             OSLogTail;                         /* Log read index                          */
-OS_EXT  INT8U             OSLogCount;                        /* Number of buffered records              */
-OS_EXT  INT32U            OSLogOverflowCtr;                  /* Number of overwritten log records       */
-OS_EXT  INT8U             OSLogPendEvent;                    /* Pending event tag for next task switch  */
-OS_EXT  BOOLEAN           TimeIsReset;                       /* Synchonize the time                     */
 #if (OS_MEM_EN > 0) && (OS_MAX_MEM_PART > 0)
 OS_EXT  OS_MEM           *OSMemFreeList;            /* Pointer to free list of memory partitions       */
 OS_EXT  OS_MEM            OSMemTbl[OS_MAX_MEM_PART];/* Storage for memory partition manager            */
@@ -788,9 +758,6 @@ void          OSStart(void);
 void          OSStatInit(void);
 
 INT16U        OSVersion(void);
-
-void          OSLogTaskSwCapture(void); /* [LAB1] */
-INT8U         OSGetLOG(OS_LOG *prec);
 
 /*$PAGE*/
 /*
