@@ -173,7 +173,10 @@ void  OSIntExit (void)
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr;
 #endif
-    
+
+    INT32U min_deadline = 0xFFFFFFFF;
+    OS_TCB * ptcb;
+    OS_TCB * pedf = (OS_TCB *)0;
     
     if (OSRunning == TRUE) {
         OS_ENTER_CRITICAL();
@@ -181,15 +184,34 @@ void  OSIntExit (void)
             OSIntNesting--;
         }
         if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Reschedule only if all ISRs complete ... */
-            OSIntExitY    = OSUnMapTbl[OSRdyGrp];          /* ... and not locked.                      */
-            OSPrioHighRdy = (INT8U)((OSIntExitY << 3) + OSUnMapTbl[OSRdyTbl[OSIntExitY]]);
-            if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
-                OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy];
+            ptcb = OSTCBList;
+            while(ptcb != (OS_TCB *)0){
+                if(ptcb->OSTCBStat == OS_STAT_RDY){
+                    if(ptcb->deadLine < min_deadline){
+                        min_deadline = ptcb->deadLine;
+                        pedf = ptcb;
+                    }
+                    else if(ptcb->deadLine == min_deadline){
+                        if (pedf == (OS_TCB *)0 || ptcb->OSTCBPrio < pedf->OSTCBPrio) {
+                            pedf = ptcb;
+                        }
+                    }
+                }
+                ptcb = ptcb->OSTCBNext;
+            }
+            if (pedf != (OS_TCB *)0) {
+                OSPrioHighRdy = pedf->OSTCBPrio;
+                if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
+                    OSTCBHighRdy  = pedf;
 #if OS_LAB1_EN > 0 
-                OSLogPendEvent = OS_LOG_EVT_PREEMPT;       /* [Kash] Tag as preempt for LOG             */ 
+                    OSLogPendEvent = OS_LOG_EVT_PREEMPT;       /* [Kash] Tag as preempt for LOG             */ 
 #endif
-                OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
-                OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
+                    OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
+                    OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
+                }
+            }
+            else{
+                                                                /* Should not occur                         */
             }
         }
         OS_EXIT_CRITICAL();

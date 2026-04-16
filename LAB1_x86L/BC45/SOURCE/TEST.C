@@ -132,21 +132,21 @@ void  InitTestSet (void){
 
     TaskCFG[1].TaskID = 2;
     TaskCFG[1].TaskCompTime = 3;
-    TaskCFG[1].TaskPeriod = 6;
+    TaskCFG[1].TaskPeriod = 5;
 #elif TASK_SET_NO == 2 
     Taskcount = 3;
 
     TaskCFG[0].TaskID = 1;
     TaskCFG[0].TaskCompTime = 1;
-    TaskCFG[0].TaskPeriod = 3;
+    TaskCFG[0].TaskPeriod = 4;
 
     TaskCFG[1].TaskID = 2;
-    TaskCFG[1].TaskCompTime = 3;
-    TaskCFG[1].TaskPeriod = 6;
+    TaskCFG[1].TaskCompTime = 2;
+    TaskCFG[1].TaskPeriod = 5;
 
     TaskCFG[2].TaskID = 3;
-    TaskCFG[2].TaskCompTime = 4;  
-    TaskCFG[2].TaskPeriod = 9;
+    TaskCFG[2].TaskCompTime = 2;  
+    TaskCFG[2].TaskPeriod = 10;
 #endif
 }
 
@@ -229,7 +229,9 @@ void  Task (void *pdata)
             toDelay = 1;
         }  
         start = start + curTask.TaskPeriod;
-
+        OS_ENTER_CRITICAL();
+            OSTCBCur->deadLine += curTask.TaskPeriod;
+        OS_EXIT_CRITICAL();
         OSTimeDly((INT16U)toDelay);  
     }
 }
