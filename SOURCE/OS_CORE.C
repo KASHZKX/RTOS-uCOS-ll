@@ -316,18 +316,43 @@ void  OSSchedUnlock (void)
 
 void  OSStart (void)
 {
-    INT8U y;
-    INT8U x;
+#if OS_CRITICAL_METHOD == 3
+    OS_CPU_SR  cpu_sr;
+#endif
 
+    INT32U min_deadline = 0xFFFFFFFF;
+    OS_TCB *pedf = (OS_TCB *)0;
+    OS_TCB *ptcb;
 
     if (OSRunning == FALSE) {
-        y             = OSUnMapTbl[OSRdyGrp];        /* Find highest priority's task priority number   */
-        x             = OSUnMapTbl[OSRdyTbl[y]];
-        OSPrioHighRdy = (INT8U)((y << 3) + x);
-        OSPrioCur     = OSPrioHighRdy;
-        OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy]; /* Point to highest priority task ready to run    */
-        OSTCBCur      = OSTCBHighRdy;
-        OSStartHighRdy();                            /* Execute target specific code to start task     */
+        OS_ENTER_CRITICAL();
+
+        ptcb = OSTCBList;
+        while(ptcb != (OS_TCB *)0){
+            if (ptcb->OSTCBStat == OS_STAT_RDY) {
+                if(ptcb->deadLine < min_deadline){
+                    min_deadline = ptcb->deadLine;
+                    pedf = ptcb;
+                }
+                else if(ptcb->deadLine == min_deadline){
+                    if (pedf == (OS_TCB *)0 || ptcb->OSTCBPrio < pedf->OSTCBPrio) {
+                        pedf = ptcb;
+                    }
+                }
+            }
+            ptcb = ptcb->OSTCBNext;
+        }
+        if (pedf != (OS_TCB *)0) {
+            OSPrioHighRdy = pedf->OSTCBPrio;
+            OSPrioCur     = OSPrioHighRdy;
+            OSTCBHighRdy  = pedf;                        /* Point to highest priority task ready to run    */
+            OSTCBCur      = OSTCBHighRdy;
+            OS_ENTER_CRITICAL();
+            OSStartHighRdy();                            /* Execute target specific code to start task     */
+        }
+        else{
+            OS_EXIT_CRITICAL();                          /* Should not Occur                               */
+        }
     }
 }
 /*$PAGE*/
