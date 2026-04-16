@@ -207,8 +207,10 @@ void  Task (void *pdata)
     OSSemPend(StartSem, 0, &err);
     sprintf(s,"%5u %5lu", OSTCBCur->compTime, OSTCBCur->deadLine);
     PC_DispStr(0, curTask.TaskID,(INT8U *)s, DISP_FGND_RED + DISP_BGND_BLACK);
-    start = 0;
-
+    start = OSTimeGet();
+    OS_ENTER_CRITICAL();
+    OSTCBCur->deadLine = start + curTask.TaskPeriod;
+    OS_EXIT_CRITICAL();
     for (;;) {
         OS_ENTER_CRITICAL();
         OSTCBCur->compTime = curTask.TaskCompTime;
@@ -218,7 +220,7 @@ void  Task (void *pdata)
         }
         
         end = OSTimeGet();
-        toDelay = (INT32S)curTask.TaskPeriod - (INT32S)(end - start);
+        toDelay = (INT32S)(start + curTask.TaskPeriod - end);
         
         if (toDelay < 0) {
             sprintf(s, "deadline violation #%u", curTask.TaskID);
@@ -230,7 +232,7 @@ void  Task (void *pdata)
         }  
         start = start + curTask.TaskPeriod;
         OS_ENTER_CRITICAL();
-            OSTCBCur->deadLine += curTask.TaskPeriod;
+            OSTCBCur->deadLine = start + curTask.TaskPeriod;
         OS_EXIT_CRITICAL();
         OSTimeDly((INT16U)toDelay);  
     }

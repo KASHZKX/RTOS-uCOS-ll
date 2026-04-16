@@ -114,6 +114,49 @@ void  OSInit (void)
     OSInitHookEnd();                                             /* Call port specific init. code            */
 #endif
 }
+
+/*$PAGE*/
+/*
+*********************************************************************************************************
+*                                             INITIALIZATION
+*
+* Description: 
+*
+* Arguments  : none
+*
+* Returns    : none
+*********************************************************************************************************
+*/
+
+void OS_EDF_FindHighRdy(void) {
+    OS_TCB *ptcb;
+    OS_TCB *pbest = (OS_TCB *)0;
+    INT32U  min_dl = 0xFFFFFFFF;
+
+    ptcb = OSTCBList;
+    while (ptcb != (OS_TCB *)0) {
+        // 1. 必須同時滿足 Ready 且沒有 Delay
+        if (ptcb->OSTCBStat == OS_STAT_RDY && ptcb->OSTCBDly == 0) {
+            // 2. 比較絕對截止時間
+            if (ptcb->deadLine < min_dl) {
+                min_dl = ptcb->deadLine;
+                pbest = ptcb;
+            } 
+            // 3. Deadline 一樣時，用 Priority 當 Tie-breaker
+            else if (ptcb->deadLine == min_dl) {
+                if (pbest == (OS_TCB *)0 || ptcb->OSTCBPrio < pbest->OSTCBPrio) {
+                    pbest = ptcb;
+                }
+            }
+        }
+        ptcb = ptcb->OSTCBNext;
+    }
+    if (pbest != (OS_TCB *)0) {
+        OSPrioHighRdy = pbest->OSTCBPrio;
+        OSTCBHighRdy  = pbest;
+    }
+}
+
 /*$PAGE*/
 /*
 *********************************************************************************************************
@@ -173,10 +216,6 @@ void  OSIntExit (void)
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr;
 #endif
-
-    INT32U min_deadline = 0xFFFFFFFF;
-    OS_TCB * ptcb;
-    OS_TCB * pedf = (OS_TCB *)0;
     
     if (OSRunning == TRUE) {
         OS_ENTER_CRITICAL();
@@ -184,35 +223,12 @@ void  OSIntExit (void)
             OSIntNesting--;
         }
         if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Reschedule only if all ISRs complete ... */
-            ptcb = OSTCBList;
-            while(ptcb != (OS_TCB *)0){
-                if(ptcb->OSTCBStat == OS_STAT_RDY){
-                    if(ptcb->deadLine < min_deadline){
-                        min_deadline = ptcb->deadLine;
-                        pedf = ptcb;
-                    }
-                    else if(ptcb->deadLine == min_deadline){
-                        if (pedf == (OS_TCB *)0 || ptcb->OSTCBPrio < pedf->OSTCBPrio) {
-                            pedf = ptcb;
-                        }
-                    }
-                }
-                ptcb = ptcb->OSTCBNext;
-            }
-            if (pedf != (OS_TCB *)0) {
-                OSPrioHighRdy = pedf->OSTCBPrio;
-                if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
-                    OSTCBHighRdy  = pedf;
+            OS_EDF_FindHighRdy();
 #if OS_LAB1_EN > 0 
-                    OSLogPendEvent = OS_LOG_EVT_PREEMPT;       /* [Kash] Tag as preempt for LOG             */ 
+            OSLogPendEvent = OS_LOG_EVT_PREEMPT;       /* [Kash] Tag as preempt for LOG             */ 
 #endif
-                    OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
-                    OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
-                }
-            }
-            else{
-                                                                /* Should not occur                         */
-            }
+            OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
+            OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
         }
         OS_EXIT_CRITICAL();
     }
@@ -320,39 +336,14 @@ void  OSStart (void)
     OS_CPU_SR  cpu_sr;
 #endif
 
-    INT32U min_deadline = 0xFFFFFFFF;
-    OS_TCB *pedf = (OS_TCB *)0;
-    OS_TCB *ptcb;
-
     if (OSRunning == FALSE) {
         OS_ENTER_CRITICAL();
+        OS_EDF_FindHighRdy();
 
-        ptcb = OSTCBList;
-        while(ptcb != (OS_TCB *)0){
-            if (ptcb->OSTCBStat == OS_STAT_RDY) {
-                if(ptcb->deadLine < min_deadline){
-                    min_deadline = ptcb->deadLine;
-                    pedf = ptcb;
-                }
-                else if(ptcb->deadLine == min_deadline){
-                    if (pedf == (OS_TCB *)0 || ptcb->OSTCBPrio < pedf->OSTCBPrio) {
-                        pedf = ptcb;
-                    }
-                }
-            }
-            ptcb = ptcb->OSTCBNext;
-        }
-        if (pedf != (OS_TCB *)0) {
-            OSPrioHighRdy = pedf->OSTCBPrio;
-            OSPrioCur     = OSPrioHighRdy;
-            OSTCBHighRdy  = pedf;                        /* Point to highest priority task ready to run    */
-            OSTCBCur      = OSTCBHighRdy;
-            OS_ENTER_CRITICAL();
-            OSStartHighRdy();                            /* Execute target specific code to start task     */
-        }
-        else{
-            OS_EXIT_CRITICAL();                          /* Should not Occur                               */
-        }
+        OSPrioCur     = OSPrioHighRdy;
+        OSTCBCur      = OSTCBHighRdy;
+        OS_EXIT_CRITICAL();
+        OSStartHighRdy();                            /* Execute target specific code to start task     */
     }
 }
 /*$PAGE*/
@@ -938,22 +929,18 @@ void  OS_Sched (void)
 #endif    
     INT8U      y;
 
-
     OS_ENTER_CRITICAL();
     if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Sched. only if all ISRs done & not locked    */
-        y             = OSUnMapTbl[OSRdyGrp];          /* Get pointer to HPT ready to run              */
-        OSPrioHighRdy = (INT8U)((y << 3) + OSUnMapTbl[OSRdyTbl[y]]);
-        if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy     */
-            OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
+        OS_EDF_FindHighRdy();
 #if OS_LAB1_EN > 0
-            OSLogPendEvent = OS_LOG_EVT_COMPLETE;      /* [Kash] tag as completed for LOG              */
+        OSLogPendEvent = OS_LOG_EVT_COMPLETE;      /* [Kash] tag as completed for LOG              */
 #endif
-            OSCtxSwCtr++;                              /* Increment context switch counter             */
-            OS_TASK_SW();                              /* Perform a context switch                     */
-        }
+        OSCtxSwCtr++;                              /* Increment context switch counter             */
+        OS_TASK_SW();                              /* Perform a context switch                     */
+        OS_EXIT_CRITICAL();          
     }
-    OS_EXIT_CRITICAL();
 }
+
 /*$PAGE*/
 /*
 *********************************************************************************************************
