@@ -308,16 +308,12 @@ void  OSTaskSwHook (void)
 #if OS_CPU_HOOKS_EN > 0 && OS_VERSION > 203
 void  OSTCBInitHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                                       /* Prevent Compiler warning                 */
 #if OS_LAB1_EN > 0
-    ptcb->compTime       = 0;                          /* [Kash] Task's computation time           */ 
-#endif
 
-#if OS_LAB2_EN > 0                                     /* [Kash] Task's deadline time               */
     if (ptcb->OSTCBExtPtr != (void *)0) { 
         TASKCFG *p_cfg = (TASKCFG *)ptcb->OSTCBExtPtr;
-        ptcb->compTime = p_cfg->TaskCompTime;
-        ptcb->deadLine = p_cfg->TaskPeriod;
+        ptcb->compTime = p_cfg->taskCompTime;
+        ptcb->deadLine = p_cfg->taskPeriod;
     } else {
         ptcb->compTime = 0;
         ptcb->deadLine = 0xFFFFFFFF; 

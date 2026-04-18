@@ -13,9 +13,10 @@
 #if OS_LAB1_EN > 0
 
 typedef struct {
-    INT16U TaskID;
-    INT16U TaskCompTime;
-    INT16U TaskPeriod;
+    INT16U taskCompTime;
+    INT16U taskPeriod;
+    INT32U taskStart;
+    INT32U taskDeadLine;
 } TASKCFG;
 
 /*

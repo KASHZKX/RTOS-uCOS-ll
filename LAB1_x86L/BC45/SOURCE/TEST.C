@@ -34,6 +34,9 @@ OS_STK        TaskStk[MAX_TASKS][TASK_STK_SIZE];        /* Tasks stacks         
 OS_STK        TaskStartStk[TASK_STK_SIZE];
 OS_STK        LogStk[LOG_STK_SIZE];
 TASKCFG       TaskCFG[MAX_TASKS];                      /* Parameters to pass to each task               */
+TASKCFG       TaskStartCFG[1];                         /* Parameters to pass to the start task               */
+TASKCFG       TaskLogCFG[1];                           /* Parameters to pass to the log task               */
+
 INT8U         Taskcount;
 FILE *fp_log;
 /*
@@ -67,8 +70,18 @@ void  main (void)
 
     PC_DOSSaveReturn();                                    /* Save environment to return to DOS        */
     PC_VectSet(uCOS, OSCtxSw);                             /* Install uC/OS-II's context switch vector */
-
-    OSTaskCreate(TaskStart, (void *)0, &TaskStartStk[TASK_STK_SIZE - 1], 0);
+    InitTestSet();                                         /* Initialize test set                      */
+    // OSTaskCreate(TaskStart, (void *)0, &TaskStartStk[TASK_STK_SIZE - 1], 0);
+    OSTaskCreateExt(
+        TaskStart,
+        (void *)0,
+        &TaskStartStk[TASK_STK_SIZE - 1],
+        0,
+        0,
+        &TaskStartStk[0],
+        TASK_STK_SIZE,
+        (void *)&TaskStartCFG[0],
+        0);
     OSStart();                                             /* Start multitasking                       */
 }
 
@@ -93,7 +106,6 @@ void  TaskStart (void *pdata)
     PC_SetTickRate(OS_TICKS_PER_SEC);                      /* Reprogram tick rate                      */
     OS_EXIT_CRITICAL();
 
-    InitTestSet();                                         /* Initialize test set                      */
     TaskStartCreateTasks();                                /* Create all the application tasks         */
 
     OS_ENTER_CRITICAL();
@@ -123,30 +135,47 @@ void  TaskStart (void *pdata)
 */
 
 void  InitTestSet (void){
+
+    TaskStartCFG[0].taskCompTime = 0xFFFF;
+    TaskStartCFG[0].taskPeriod = 0xFFFF;
+    TaskStartCFG[0].taskStart = 0xFFFFFFFF;
+    TaskStartCFG[0].taskDeadLine = 0xFFFFFFFF;
+
+    TaskLogCFG[0].taskCompTime = 0xFFFF;
+    TaskLogCFG[0].taskPeriod = 0xFFFF;
+    TaskLogCFG[0].taskStart = 0xFFFFFFFF;
+    TaskLogCFG[0].taskDeadLine = 0xFFFFFFFF;
+
 #if TASK_SET_NO == 1
     Taskcount = 2;
 
-    TaskCFG[0].TaskID = 1;
-    TaskCFG[0].TaskCompTime = 1;
-    TaskCFG[0].TaskPeriod = 3;
+    TaskCFG[0].taskCompTime = 1;
+    TaskCFG[0].taskPeriod = 3;
+    TaskCFG[0].taskStart = 0;
+    TaskCFG[0].taskDeadLine = 3;
 
-    TaskCFG[1].TaskID = 2;
-    TaskCFG[1].TaskCompTime = 3;
-    TaskCFG[1].TaskPeriod = 5;
+    TaskCFG[1].taskCompTime = 3;
+    TaskCFG[1].taskPeriod = 5;
+    TaskCFG[1].taskStart = 0;
+    TaskCFG[1].taskDeadLine = 5;
+
 #elif TASK_SET_NO == 2 
     Taskcount = 3;
 
-    TaskCFG[0].TaskID = 1;
-    TaskCFG[0].TaskCompTime = 1;
-    TaskCFG[0].TaskPeriod = 4;
+    TaskCFG[0].taskCompTime = 1;
+    TaskCFG[0].taskPeriod = 4;
+    TaskCFG[0].taskStart = 0;
+    TaskCFG[0].taskDeadLine = 4;
 
-    TaskCFG[1].TaskID = 2;
-    TaskCFG[1].TaskCompTime = 2;
-    TaskCFG[1].TaskPeriod = 5;
+    TaskCFG[1].taskCompTime = 2;
+    TaskCFG[1].taskPeriod = 5;
+    TaskCFG[1].taskStart = 0;
+    TaskCFG[1].taskDeadLine = 5;
 
-    TaskCFG[2].TaskID = 3;
-    TaskCFG[2].TaskCompTime = 2;  
-    TaskCFG[2].TaskPeriod = 10;
+    TaskCFG[2].taskCompTime = 2;  
+    TaskCFG[2].taskPeriod = 10;
+    TaskCFG[2].taskStart = 0;
+    TaskCFG[2].taskDeadLine = 10;
 #endif
 }
 
@@ -183,7 +212,7 @@ static  void  TaskStartCreateTasks (void)
         OS_LOWEST_PRIO - 2,
         &LogStk[0],
         LOG_STK_SIZE,
-        (void *)0,
+        (void *)&TaskLogCFG[0],
         0);
 }
 
@@ -205,34 +234,33 @@ void  Task (void *pdata)
     curTask = *(TASKCFG *)pdata;
 
     OSSemPend(StartSem, 0, &err);
-    sprintf(s,"%5u %5lu", OSTCBCur->compTime, OSTCBCur->deadLine);
-    PC_DispStr(0, curTask.TaskID,(INT8U *)s, DISP_FGND_RED + DISP_BGND_BLACK);
+    printf("%5u %5lu\n", OSTCBCur->compTime, OSTCBCur->deadLine);
+  
     start = OSTimeGet();
     OS_ENTER_CRITICAL();
-    OSTCBCur->deadLine = start + curTask.TaskPeriod;
+    OSTCBCur->deadLine = start + curTask.taskPeriod;
     OS_EXIT_CRITICAL();
     for (;;) {
         OS_ENTER_CRITICAL();
-        OSTCBCur->compTime = curTask.TaskCompTime;
+        OSTCBCur->compTime = curTask.taskCompTime;
         OS_EXIT_CRITICAL();
 
         while(OSTCBCur->compTime > 0){
         }
         
         end = OSTimeGet();
-        toDelay = (INT32S)(start + curTask.TaskPeriod - end);
+        toDelay = (INT32S)(start + curTask.taskPeriod - end);
         
         if (toDelay < 0) {
-            sprintf(s, "deadline violation #%u", curTask.TaskID);
-            PC_DispStr(0, 24, (INT8U *)s, DISP_FGND_RED + DISP_BGND_BLACK);
+            printf("deadline violation #%u", OSTCBCur->OSTCBPrio);
 
             OSTaskDel(OS_PRIO_SELF);
         } else if (toDelay == 0){  
             toDelay = 1;
         }  
-        start = start + curTask.TaskPeriod;
+        start = start + curTask.taskPeriod;
         OS_ENTER_CRITICAL();
-            OSTCBCur->deadLine = start + curTask.TaskPeriod;
+            OSTCBCur->deadLine = start + curTask.taskPeriod;
         OS_EXIT_CRITICAL();
         OSTimeDly((INT16U)toDelay);  
     }

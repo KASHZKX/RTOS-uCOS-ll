@@ -412,10 +412,10 @@ typedef struct os_tcb {
     BOOLEAN        OSTCBDelReq;        /* Indicates whether a task needs to delete itself              */
 #endif
 #if OS_LAB1_EN > 0
-    volatile INT8U          compTime;
-#endif
-#if OS_LAB2_EN > 0
-    volatile INT32U         deadLine;
+    INT16U         compTime;
+    INT16U         period; 
+    INT32U         startTime;
+    INT32U         deadLine;
 #endif
 } OS_TCB;
 
