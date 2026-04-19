@@ -313,9 +313,9 @@ void  OSTCBInitHook (OS_TCB *ptcb)
     if (ptcb->OSTCBExtPtr != (void *)0) { 
         TASKCFG *p_cfg = (TASKCFG *)ptcb->OSTCBExtPtr;
         ptcb->compTime = p_cfg->taskCompTime;
-        ptcb->deadLine = p_cfg->taskPeriod;
+        ptcb->deadLine = p_cfg->taskDeadLine;
     } else {
-        ptcb->compTime = 0;
+        ptcb->compTime = 0xFFFF;
         ptcb->deadLine = 0xFFFFFFFF; 
     }
 #endif

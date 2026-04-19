@@ -135,16 +135,16 @@ void OS_EDF_FindHighRdy(void) {
 
     ptcb = OSTCBList;
     while (ptcb != (OS_TCB *)0) {
-        // 1. 必須同時滿足 Ready 且沒有 Delay
         if (ptcb->OSTCBStat == OS_STAT_RDY && ptcb->OSTCBDly == 0) {
-            // 2. 比較絕對截止時間
             if (ptcb->deadLine < min_dl) {
                 min_dl = ptcb->deadLine;
                 pbest = ptcb;
             } 
-            // 3. Deadline 一樣時，用 Priority 當 Tie-breaker
             else if (ptcb->deadLine == min_dl) {
-                if (pbest == (OS_TCB *)0 || ptcb->OSTCBPrio < pbest->OSTCBPrio) {
+                if (pbest == (OS_TCB *)0 || ptcb->compTime < pbest->compTime) {
+                    pbest = ptcb;
+                }
+                else if(ptcb->compTime == pbest->compTime && ptcb == OSTCBCur){
                     pbest = ptcb;
                 }
             }

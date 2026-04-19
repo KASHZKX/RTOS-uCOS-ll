@@ -20,7 +20,7 @@
 
 #define  TASK_STK_SIZE                1024       /* Size of each task's stacks (# of WORDs)            */
 #define  MAX_TASKS                       5       /* Number of identical tasks                          */
-#define  TASK_SET_NO                     1       /* No of test sets (1, 2)                             */
+#define  TASK_SET_NO                     2       /* No of test sets (1, 2)                             */
 #define  LOG_STK_SIZE                 1024
 #define  LOG_FIRST_LINE                  1
 #define  LOG_LAST_LINE                  20
@@ -97,9 +97,11 @@ void  TaskStart (void *pdata)
 #endif
     char       s[100];
     INT8U  i;
+    OS_SEM_DATA  sem_data;
+    INT8U        err;
+    INT16U       count;
     INT32U current;
     pdata = pdata;                                         /* Prevent compiler warning                 */
-    StartSem = OSSemCreate(0);
 
     OS_ENTER_CRITICAL();
     PC_VectSet(0x08, OSTickISR);                           /* Install uC/OS-II's clock tick ISR        */
@@ -108,24 +110,15 @@ void  TaskStart (void *pdata)
 
     TaskStartCreateTasks();                                /* Create all the application tasks         */
 
-    OS_ENTER_CRITICAL();
-        current = OSTimeGet();
-    OS_EXIT_CRITICAL();
-
+    current = OSTimeGet();
     while (OSTimeGet() == current){
-    } 
 
+    } 
+ 
     TimeIsReset = TRUE;
     OSTimeSet(0); 
 
-    OS_ENTER_CRITICAL();
-    for (i = 0; i < Taskcount + 1; i++) { 
-        OSSemPost(StartSem);
-    }
-    OS_EXIT_CRITICAL();
-
     OSTaskDel(OS_PRIO_SELF);
-
 }
 
 /*
@@ -136,15 +129,15 @@ void  TaskStart (void *pdata)
 
 void  InitTestSet (void){
 
-    TaskStartCFG[0].taskCompTime = 0xFFFF;
-    TaskStartCFG[0].taskPeriod = 0xFFFF;
-    TaskStartCFG[0].taskStart = 0xFFFFFFFF;
-    TaskStartCFG[0].taskDeadLine = 0xFFFFFFFF;
+    TaskStartCFG[0].taskCompTime = 0;
+    TaskStartCFG[0].taskPeriod = 0;
+    TaskStartCFG[0].taskStart = 0;
+    TaskStartCFG[0].taskDeadLine = 0;
 
     TaskLogCFG[0].taskCompTime = 0xFFFF;
     TaskLogCFG[0].taskPeriod = 0xFFFF;
     TaskLogCFG[0].taskStart = 0xFFFFFFFF;
-    TaskLogCFG[0].taskDeadLine = 0xFFFFFFFF;
+    TaskLogCFG[0].taskDeadLine = 0xFFFFFFFD;
 
 #if TASK_SET_NO == 1
     Taskcount = 2;
@@ -224,45 +217,45 @@ static  void  TaskStartCreateTasks (void)
 
 void  Task (void *pdata)
 {
-    TASKCFG curTask;
-    INT32U start;
-    INT32U end;
-    INT32S toDelay;
-    char s[64];
+    TASKCFG *data = (TASKCFG *)pdata;
+    INT16S start = 0;
+    INT16S end;
+    INT16S toDelay;
     INT8U err;
-
-    curTask = *(TASKCFG *)pdata;
-
-    OSSemPend(StartSem, 0, &err);
-    printf("%5u %5lu\n", OSTCBCur->compTime, OSTCBCur->deadLine);
+    char s[64];
   
-    start = OSTimeGet();
     OS_ENTER_CRITICAL();
-    OSTCBCur->deadLine = start + curTask.taskPeriod;
+    OSTCBCur->compTime = start + data->taskCompTime;
+    OSTCBCur->period = data->taskPeriod;
+    OSTCBCur->startTime = start;
+    OSTCBCur->deadLine = start + data->taskPeriod;
     OS_EXIT_CRITICAL();
-    for (;;) {
-        OS_ENTER_CRITICAL();
-        OSTCBCur->compTime = curTask.taskCompTime;
-        OS_EXIT_CRITICAL();
 
-        while(OSTCBCur->compTime > 0){
+    while(1) {
+        while(1){
+            OS_ENTER_CRITICAL();  
+            if(OSTCBCur->compTime <= 0){
+                OS_EXIT_CRITICAL();
+                break;
+            }
+            OS_EXIT_CRITICAL();
         }
-        
         end = OSTimeGet();
-        toDelay = (INT32S)(start + curTask.taskPeriod - end);
-        
+        toDelay = data->taskPeriod - (end - start);
         if (toDelay < 0) {
             printf("deadline violation #%u", OSTCBCur->OSTCBPrio);
-
             OSTaskDel(OS_PRIO_SELF);
         } else if (toDelay == 0){  
             toDelay = 1;
         }  
-        start = start + curTask.taskPeriod;
+        start = start + data->taskPeriod;
+
         OS_ENTER_CRITICAL();
-            OSTCBCur->deadLine = start + curTask.taskPeriod;
+        OSTCBCur->compTime = data->taskCompTime;
+        OSTCBCur->startTime = start;
+        OSTCBCur->deadLine = start + data->taskPeriod;
         OS_EXIT_CRITICAL();
-        OSTimeDly((INT16U)toDelay);  
+        OSTimeDly(toDelay);  
     }
 }
 
@@ -270,7 +263,6 @@ void  Task (void *pdata)
 void  LogTask (void *pdata){
     OS_LOG prec;
     INT16S     key;
-    INT8U line = LOG_FIRST_LINE;
     char s[80];
     char from[16];
     char to[16];
@@ -279,13 +271,10 @@ void  LogTask (void *pdata){
     
     pdata = pdata; 
 
-
     fp_log = fopen("NEW_LOG.txt", "w");
     if (fp_log == NULL) {
         PC_DispStr(0, 24, "File Open Error!", DISP_FGND_RED);
     }
-
-    OSSemPend(StartSem, 0, &err);
 
     for(;;){   
 
@@ -310,17 +299,11 @@ void  LogTask (void *pdata){
                 from, 
                 to);
             
-            // PC_DispStr(5, line, (INT8U *)s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
             if (fp_log != NULL) {
                 fprintf(fp_log, "%s\n", s);
             }
 
-            line++;
             log_count++;
-
-            if(line >= LOG_LAST_LINE){
-                line = LOG_FIRST_LINE; 
-            }
         }
         if (fp_log != NULL) {
             fflush(fp_log); 
